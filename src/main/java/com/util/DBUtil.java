@@ -5,11 +5,31 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DBUtil {
-    private static final String DB_URL = "jdbc:postgresql://localhost:5432/postgres";
-    private static final String DB_USER = "postgres";
-    private static final String DB_PASSWORD = "";
+
+    private static final String DB_URL =
+        getEnvOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/postgres");
+
+    private static final String DB_USER =
+        getEnvOrDefault("DB_USER", "postgres");
+
+    private static final String DB_PASSWORD =
+        getRequiredEnv("DB_PASSWORD");
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+    }
+
+    private static String getEnvOrDefault(String key, String defaultValue) {
+        String value = System.getenv(key);
+        return (value == null || value.isEmpty()) ? defaultValue : value;
+    }
+
+    private static String getRequiredEnv(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isEmpty()) {
+            throw new RuntimeException(
+                "找不到環境變數 " + key + "，請先設定後再啟動程式");
+        }
+        return value;
     }
 }
