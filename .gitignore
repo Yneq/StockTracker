@@ -1,0 +1,23 @@
+## Maven
+target/
+*.class
+
+## IDE
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+bin/
+
+## 環境變數 / 密鑰相關
+.env
+*.env
+application-local.properties
+application-secret.properties
+
+## OS
+.DS_Store
+
+## 日誌
+*.log

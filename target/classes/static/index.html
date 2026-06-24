@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title> Mac Stocks Style Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	
+	<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+	
+</head>
+<body class="bg-black text-gray-100 min-h-screen p-6 font-sans antialiased">
+
+    <div class="max-w-5xl mx-auto">
+		<header class="flex justify-between items-center border-b border-gray-900 pb-4 mb-8">
+				    <div class="flex items-baseline gap-3">
+				        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+				             股市 <span class="text-sm font-normal text-gray-500">本機測試端</span>
+				        </h1>
+				        <div id="welcome-user" class="text-white text-base font-semibold border-l border-gray-800 pl-4 h-5 flex items-center">
+				            👋 載入中...
+				        </div>
+				    </div>
+				    
+				    <div class="flex items-center gap-4">
+						<a href="/watchlist.html" 
+						   class="px-5 py-2 text-sm font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30 transition">
+						    我的追蹤清單
+						</a>
+				        
+				        <button onclick="logout()" 
+				                class="px-5 py-2 text-sm font-medium bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-xl border border-green-500/30 transition cursor-pointer">
+				            登出
+				        </button>
+
+							    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">
+							        <span class="w-2 h-2 mr-2 bg-red-500 rounded-full animate-pulse flex-shrink-0"></span>
+							        已同步
+							    </span>
+				    </div>
+				</header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex flex-col justify-between h-[340px]">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-white" id="stock-2330">台積電</h2>
+                        <p class="text-xs text-gray-500">2330.TW</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="price-2330" class="text-2xl font-extrabold text-white">---</div>
+                        <div id="change-2330" class="text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block">---</div>
+                    </div>
+                </div>
+                
+                <div class="relative w-full h-[160px] mt-2">
+                    <canvas id="chart-2330"></canvas>
+                </div>
+
+				<!-- 替換原本這段 -->
+				<div class="pt-3 border-t border-gray-800 flex justify-between items-center text-xs text-gray-400 whitespace-nowrap overflow-hidden">
+				    <div class="flex items-center gap-1 flex-shrink-0">
+				        <span>美股 TSM 折合:</span>
+				        <span id="adr-2330" class="font-mono text-gray-200 font-bold">---</span>
+				    </div>
+				    <div class="flex items-center gap-1 flex-shrink-0">
+				        <span>⚡ 套利空間:</span>
+				        <span id="space-2330" class="font-mono font-bold">---</span>
+				    </div>
+				</div>
+            </div>
+
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex flex-col justify-between h-[340px]">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">鴻海</h2>
+                        <p class="text-xs text-gray-500">2317.TW</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="price-2317" class="text-2xl font-extrabold text-white">---</div>
+                        <div id="change-2317" class="text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block">---</div>
+                    </div>
+                </div>
+                <div class="relative w-full h-[160px] mt-2">
+                    <canvas id="chart-2317"></canvas>
+                </div>
+                <div class="text-xs text-gray-600 text-center pt-2 border-t border-gray-800/30">成分股監控中</div>
+            </div>
+
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex flex-col justify-between h-[340px]">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">聯發科</h2>
+                        <p class="text-xs text-gray-500">2454.TW</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="price-2454" class="text-2xl font-extrabold text-white">---</div>
+                        <div id="change-2454" class="text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block">---</div>
+                    </div>
+                </div>
+                <div class="relative w-full h-[160px] mt-2">
+                    <canvas id="chart-2454"></canvas>
+                </div>
+                <div class="text-xs text-gray-600 text-center pt-2 border-t border-gray-800/30">成分股監控中</div>
+            </div>
+
+        </div>
+    </div>
+	<!-- 月營收趨勢 -->
+
+	<div class="max-w-5xl mx-auto mt-8">
+
+	    <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl">
+
+	        <h2 class="text-xl font-bold text-white mb-4">
+	            TSMC Monthly Revenue Trend
+	        </h2>
+
+	        <div style="height:400px;">
+	            <canvas id="revenueChart"></canvas>
+	        </div>
+
+	    </div>
+
+	</div>
+
+	<script>
+		// === 登入檢查 + 顯示歡迎文字 ===
+		const token = localStorage.getItem('token');
+		if (!token) {
+		    alert("請先登入");
+		    window.location.href = "/login.html";
+		}
+
+		// 改進版：更穩健的 JWT 解碼中文
+		function decodeUsername(token) {
+		    try {
+		        const base64Url = token.split('.')[1];
+		        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+		        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+		            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+		        }).join(''));
+		        
+		        const payload = JSON.parse(jsonPayload);
+		        return payload.sub || "使用者";
+		    } catch(e) {
+		        console.error("JWT 解碼失敗", e);
+		        return "使用者";
+		    }
+		}
+
+		document.getElementById('welcome-user').innerHTML = `
+		    👋 <span class="font-medium">${decodeUsername(token)}</span>，您好！
+		`;
+
+		function logout() {
+		    if (confirm("確定要登出嗎？")) {
+		        localStorage.removeItem('token');
+		        window.location.href = "/login.html";
+		    }
+		}
+			
+	
+		let stompClient = null;
+
+		function connectWebSocket() {
+
+		    const socket =
+		        new SockJS('/ws');
+
+		    stompClient =
+		        Stomp.over(socket);
+
+		    stompClient.connect(
+		        {},
+		        function() {
+
+		            console.log(
+		                "WebSocket Connected");
+
+		            stompClient.subscribe(
+		                "/topic/stock",
+		                function(message) {
+
+		                    const data =
+		                        JSON.parse(
+		                            message.body);
+
+		                    console.log(
+		                        "即時推播:",
+		                        data);
+
+		                    updateRealtimeData(data);
+		                });
+		        });
+		}
+	    const charts = {};
+		
+		function updateRealtimeData(data) {
+		    console.log("即時推播:", data);
+
+		    // 更新股價
+		    //const priceElement = document.getElementById("price-" + data.stockCode);
+		    //if (priceElement) {
+		    //    const oldPrice = parseFloat(priceElement.innerText) || 0;
+		    //    let newPrice = parseFloat(data.price) || 0;
+		    //    const displayPrice = newPrice + 5;   // 你原本的 +5 邏輯
+
+		    //    priceElement.innerText = displayPrice.toFixed(2);
+
+		    //    priceElement.classList.remove("text-green-400", "text-red-400");
+		    //    if (displayPrice > oldPrice) {
+		    //        priceElement.classList.add("text-red-400");     // 台灣紅色上漲
+		    //    } else if (displayPrice < oldPrice) {
+		    //        priceElement.classList.add("text-green-400");   // 綠色下跌
+		    //    }
+		    //}
+
+		    // 更新漲跌幅（現在會跟著即時數據變動）
+		    const changeElement = document.getElementById("change-" + data.stockCode);
+		    if (changeElement && data.change !== undefined) {
+		        const changeValue = parseFloat(data.change) || 0;
+		        const changePercent = parseFloat(data.changePercent) || 0;
+
+		        const sign = changeValue >= 0 ? '+' : '';
+		        changeElement.innerText = `${sign}${changeValue.toFixed(2)} (${sign}${changePercent.toFixed(2)}%)`;
+
+		        // 台灣風格：紅漲綠跌
+		        changeElement.className = "text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block " +
+		            (changeValue >= 0 ? "bg-rose-600" : "bg-emerald-600");
+		    }
+
+		    // 更新 2330 的美股折合 & 套利空間
+		    if (data.stockCode === "2330") {
+		        const adrElement = document.getElementById("adr-2330");
+		        const spaceElement = document.getElementById("space-2330");
+
+		        if (adrElement && data.adrPrice !== undefined) {
+		            adrElement.innerText = data.adrPrice.toFixed(2);
+		        }
+
+		        if (spaceElement && data.adrPremium !== undefined) {
+		            const premium = parseFloat(data.adrPremium);
+		            spaceElement.innerText = (premium >= 0 ? '+' : '') + premium.toFixed(2) + "%";
+		            
+		            // 台灣習慣：正數用紅色（套利空間大 = 好）
+		            spaceElement.classList.remove("text-emerald-500", "text-rose-500");
+		            spaceElement.classList.add(premium >= 0 ? "text-rose-500" : "text-emerald-500");
+		        }
+		    }
+		}
+
+	    function generateMarketTimeline() {
+	        const timeline = [];
+	        let curr = new Date();
+	        const start = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate(), 9, 0, 0);
+	        const end = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate(), 13, 30, 0);
+	        
+	        while (start <= end) {
+	            let hh = String(start.getHours()).padStart(2, '0');
+	            let mm = String(start.getMinutes()).padStart(2, '0');
+	            timeline.push(`${hh}:${mm}`);
+	            start.setMinutes(start.getMinutes() + 1);
+	        }
+	        return timeline;
+	    }
+	    const GLOBAL_TIMELINE = generateMarketTimeline();
+
+		// 🎯 修正版：嚴格限制邊界的昨日走勢模擬器
+			    function generateMockYesterdayData(currentOpen, stockCode) {
+			        const mockData = [];
+			        
+			        // 根據今天大漲的市況，反推昨天正確的開盤與收盤邊界
+			        let yOpen = currentOpen - 80;  // 昨開
+			        let yClose = currentOpen - 65; // 昨收 (也就是大約 2250~2260 附近)
+			        
+			        if (stockCode === '2317') { yOpen = currentOpen - 4; yClose = currentOpen - 2; }
+			        if (stockCode === '2454') { yOpen = currentOpen - 130; yClose = currentOpen - 95; }
+			        
+			        const totalSteps = GLOBAL_TIMELINE.length;
+			        
+			        for (let i = 0; i < totalSteps; i++) {
+			            // 📈 線性插值 (Lerp)：讓價格完美從「昨開」平滑滑動到「昨收」
+			            let progress = i / (totalSteps - 1);
+			            let base = yOpen + (yClose - yOpen) * progress;
+			            
+			            // 🎯 大幅降低噪點頻率（把 i * 0.02 改成 0.05），並讓波動變小、變平滑，點就不會看起來密密麻麻
+			            let swing = Math.sin(i * 0.05) * (yOpen * 0.003); 
+			            let noise = (Math.random() - 0.5) * (yOpen * 0.001);
+			            
+			            // 為了美觀，我們只在每 3 分鐘才畫一個點，其餘給 null 讓 Chart.js 自動連線（spanGaps）
+			            if (i % 3 === 0 || i === totalSteps - 1) {
+			                mockData.push(base + swing + noise);
+			            } else {
+			                mockData.push(null);
+			            }
+			        }
+			        return mockData;
+			    }
+
+	    function createSparkline(canvasId, pricesMap, openPrice, yesterdayClose, themeColor) {
+	        const ctx = document.getElementById(canvasId).getContext('2d');
+	        
+	        if (!pricesMap["09:00"]) {
+	            pricesMap["09:00"] = openPrice;
+	        }
+
+	        const alignedTodayData = GLOBAL_TIMELINE.map(timeTick => {
+	            return pricesMap[timeTick] || null;
+	        });
+
+const yesterdayData = generateMockYesterdayData(openPrice, canvasId.replace('chart-', ''));
+	        if (charts[canvasId]) {
+	            charts[canvasId].data.datasets[0].data = yesterdayData; 
+	            charts[canvasId].data.datasets[1].data = alignedTodayData; 
+	            charts[canvasId].data.datasets[1].borderColor = themeColor;
+	            charts[canvasId].options.plugins.openLinePlugin.openPrice = yesterdayClose;
+	            charts[canvasId].update('none');
+	            return;
+	        }
+
+	        const openLinePlugin = {
+	            id: 'openLinePlugin',
+	            openPrice: yesterdayClose,
+	            afterDraw: (chart) => {
+	                const {ctx, chartArea: {left, right}, scales: {y}} = chart;
+	                const yValue = y.getPixelForValue(openLinePlugin.openPrice);
+	                if (yValue >= chart.chartArea.top && yValue <= chart.chartArea.bottom) {
+	                    ctx.save();
+	                    ctx.strokeStyle = '#4b5563';
+	                    ctx.lineWidth = 1;
+	                    ctx.setLineDash([2, 3]); 
+	                    ctx.beginPath(); ctx.moveTo(left, yValue); ctx.lineTo(right, yValue); ctx.stroke();
+	                    ctx.restore();
+	                }
+	            }
+	        };
+
+	        charts[canvasId] = new Chart(ctx, {
+	            type: 'line',
+	            data: {
+	                labels: GLOBAL_TIMELINE,
+	                datasets: [
+	                    {
+	                        label: '昨日走勢',
+	                        data: yesterdayData,
+	                        // 🎯 修正一：昨日背景線大幅加深顏色 (使用高飽和度的中灰色，透明度調高到 0.6)
+	                        borderColor: 'rgba(156, 163, 175, 0.6)', 
+	                        borderWidth: 2,
+	                        borderDash: [3, 3], 
+	                        pointRadius: 0,     
+	                        spanGaps: true,
+	                        tension: 0.2,
+	                        fill: false
+	                    },
+	                    {
+	                        label: '今日即時',
+	                        data: alignedTodayData,
+	                        borderColor: themeColor,
+	                        borderWidth: 3.5, 
+	                        pointRadius: 0,
+	                        spanGaps: true,
+	                        tension: 0.15,
+	                        fill: false
+	                    }
+	                ]
+	            },
+	            options: {
+	                responsive: true,
+	                maintainAspectRatio: false,
+	                scales: {
+	                    x: {
+	                        display: true,
+	                        grid: { display: false },
+	                        ticks: {
+	                            color: '#4b5563',
+	                            maxTicksLimit: 4,
+	                            callback: function(val, index) { return GLOBAL_TIMELINE[index]; }
+	                        }
+	                    },
+	                    y: { 
+	                        display: true, position: 'right',
+	                        grid: { color: '#1f2937' },
+	                        ticks: { color: '#6b7280', font: { size: 10 } },
+	                        beginAtZero: false
+	                    }
+	                },
+	                plugins: { legend: { display: false } }
+	            },
+	            plugins: [openLinePlugin]
+	        });
+	    }
+		async function loadRevenueChart() {
+
+		    try {
+
+		        const response =
+		            await fetch(
+		                "http://localhost:8080/api/revenue-history"
+		            );
+
+		        const data =
+		            await response.json();
+
+		        const labels =
+		            data.map(
+		                item => item.date
+		            );
+
+		        const revenues =
+		            data.map(
+		                item => item.revenue / 1000000000
+		            );
+
+		        const ctx =
+		            document
+		                .getElementById(
+		                    "revenueChart"
+		                );
+
+		        new Chart(ctx, {
+
+		            type: "line",
+
+		            data: {
+
+		                labels: labels,
+
+		                datasets: [
+		                    {
+		                        label:
+		                            "Revenue (Billion TWD)",
+
+		                        data: revenues,
+
+		                        borderWidth: 3,
+
+		                        tension: 0.3
+		                    }
+		                ]
+		            },
+
+		            options: {
+
+		                responsive: true,
+
+		                maintainAspectRatio: false,
+
+		                plugins: {
+
+		                    legend: {
+
+		                        labels: {
+		                            color: "#ffffff"
+		                        }
+		                    }
+		                },
+
+		                scales: {
+
+		                    x: {
+		                        ticks: {
+		                            color: "#9ca3af"
+		                        }
+		                    },
+
+		                    y: {
+		                        ticks: {
+		                            color: "#9ca3af"
+		                        }
+		                    }
+		                }
+		            }
+		        });
+
+		    } catch (e) {
+
+		        console.error(
+		            "Revenue Chart Error",
+		            e
+		        );
+		    }
+		}
+		
+	    async function fetchAndUpdate() {
+	        try {
+				const response = await fetch('http://localhost:8080/api/history');	            
+				const data = await response.json();
+				data.reverse();
+	            
+	            const validData = data.filter(item => item.price > 10 && item.openPrice > 10);
+	            if (validData.length === 0) return;
+
+	            const configs = [
+	                { code: '2330', id: 'chart-2330', priceId: 'price-2330', changeId: 'change-2330', realDiff: 60.00, realPercent: 2.67 },  // 🎯 修正二：動態代入真實漲跌幅校正
+	                { code: '2317', id: 'chart-2317', priceId: 'price-2317', changeId: 'change-2317', realDiff: 2.00, realPercent: 0.77 },
+	                { code: '2454', id: 'chart-2454', priceId: 'price-2454', changeId: 'change-2454', realDiff: 95.00, realPercent: 2.33 }
+	            ];
+
+				configs.forEach(async (config) => {
+				    const subset = validData.filter(d => d.stockCode === config.code);
+				    if (subset.length === 0) return;
+
+				    const latest = subset[subset.length - 1];
+				    const currentPrice = parseFloat(latest.price) || 0;
+				    const openPrice = parseFloat(latest.openPrice) || currentPrice;
+
+				    // === 抓真實昨日收盤價 ===
+				    let yesterdayClose = null;
+				    try {
+				        const res = await fetch(`/api/previous-close/${config.code}`);
+				        if (res.ok) {
+				            yesterdayClose = parseFloat(await res.text());
+				        }
+				    } catch (e) {}
+
+				    // 後備方案
+				    if (!yesterdayClose || isNaN(yesterdayClose)) {
+				        yesterdayClose = openPrice - (config.code === '2330' ? 60 : config.code === '2317' ? 2 : 95);
+				    }
+
+				    const diff = currentPrice - yesterdayClose;
+				    const percent = yesterdayClose !== 0 ? (diff / yesterdayClose) * 100 : 0;
+
+				    // 更新價格（保留你 +5 的習慣）
+				    document.getElementById(config.priceId).innerText = (currentPrice + 5).toFixed(2);
+
+				    // 更新漲跌幅（真實計算）
+				    const changeEl = document.getElementById(config.changeId);
+				    const sign = diff >= 0 ? '+' : '';
+				    changeEl.innerText = `${sign}${diff.toFixed(2)} (${sign}${percent.toFixed(2)}%)`;
+
+				    // 台灣風格：紅上漲 / 綠下跌
+				    changeEl.className = `text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block ${
+				        diff >= 0 ? 'bg-rose-600' : 'bg-emerald-600'
+				    }`;
+
+				    // 2330 的 ADR & 套利空間
+				    if (config.code === '2330') {
+				        const adrEl = document.getElementById('adr-2330');
+				        const spaceEl = document.getElementById('space-2330');
+
+				        if (adrEl && latest.adrPrice) {
+				            adrEl.innerText = parseFloat(latest.adrPrice).toFixed(2);
+				        }
+				        if (spaceEl && latest.arbitrageSpace !== undefined) {
+				            const space = parseFloat(latest.arbitrageSpace);
+				            spaceEl.innerText = (space >= 0 ? '+' : '') + space.toFixed(2) + "%";
+				            spaceEl.className = `font-mono font-bold ${space >= 0 ? 'text-rose-500' : 'text-emerald-500'}`;
+				        }
+				    }
+
+				    // Sparkline ...
+				    const pricesMap = {};
+				    subset.forEach(d => {
+				        let timeKey = d.tradeTime.substring(0, 5);
+				        pricesMap[timeKey] = parseFloat(d.price);
+				    });
+				    createSparkline(config.id, pricesMap, openPrice, yesterdayClose, diff >= 0 ? '#f43f5e' : '#10b981');
+				});
+
+	        } catch (e) {
+	            console.error("前端同步失敗", e);
+	        }
+	    }
+
+		fetchAndUpdate();
+
+		connectWebSocket();
+
+		loadRevenueChart();
+	</script>	
+</body>
+</html>

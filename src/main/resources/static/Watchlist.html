@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>我的追蹤清單</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body class="bg-black text-gray-100 min-h-screen p-6 font-sans antialiased">
+
+    <div class="max-w-5xl mx-auto">
+
+        <header class="flex justify-between items-center border-b border-gray-900 pb-4 mb-8">
+            <div class="flex items-baseline gap-3">
+                <h1 class="text-2xl font-bold tracking-tight text-white">
+                    我的追蹤清單
+                </h1>
+                <div id="welcome-user" class="text-white text-base font-semibold border-l border-gray-800 pl-4 h-5 flex items-center">
+                    👋 載入中...
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="/index.html"
+                   class="px-5 py-2 text-sm font-medium bg-gray-500/10 hover:bg-gray-500/20 text-gray-300 rounded-xl border border-gray-500/30 transition">
+                    ← 回到主頁
+                </a>
+                <button onclick="logout()"
+                        class="px-5 py-2 text-sm font-medium bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-xl border border-green-500/30 transition cursor-pointer">
+                    登出
+                </button>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">
+                    <span class="w-2 h-2 mr-2 bg-red-500 rounded-full animate-pulse flex-shrink-0"></span>
+                    已同步
+                </span>
+            </div>
+        </header>
+
+        <!-- 新增股票 -->
+        <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl mb-6">
+            <h2 class="text-sm font-medium text-gray-400 mb-3">新增追蹤股票</h2>
+            <div class="flex gap-3">
+                <input id="stockCodeInput" type="text" placeholder="輸入股票代碼，例如 2330,2603"
+                       class="flex-1 bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500" />
+                <button onclick="addStock()"
+                        class="px-5 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg border border-blue-500/30 transition font-medium">
+                    加入追蹤
+                </button>
+            </div>
+            <div id="addMessage" class="text-sm mt-2"></div>
+        </div>
+
+        <!-- 追蹤股票方格卡片 -->
+        <div id="watchlistGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-gray-500 text-sm col-span-3">載入中...</div>
+        </div>
+
+    </div>
+
+<script>
+    // ============ 登入檢查 ============
+    const token = localStorage.getItem('token');
+    if (!token) {
+        alert("請先登入");
+        window.location.href = "/login.html";
+    }
+
+    function decodeUsername(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            const payload = JSON.parse(jsonPayload);
+            return payload.sub || "使用者";
+        } catch(e) {
+            return "使用者";
+        }
+    }
+
+    document.getElementById('welcome-user').innerHTML =
+        `👋 <span class="font-medium">${decodeUsername(token)}</span>，您好！`;
+
+    function logout() {
+        if (confirm("確定要登出嗎？")) {
+            localStorage.removeItem('token');
+            window.location.href = "/login.html";
+        }
+    }
+
+    // ============ 共用：產生時間軸 ============
+    function generateMarketTimeline() {
+        const timeline = [];
+        const curr = new Date();
+        const start = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate(), 9, 0, 0);
+        const end   = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate(), 13, 30, 0);
+        while (start <= end) {
+            const hh = String(start.getHours()).padStart(2, '0');
+            const mm = String(start.getMinutes()).padStart(2, '0');
+            timeline.push(`${hh}:${mm}`);
+            start.setMinutes(start.getMinutes() + 1);
+        }
+        return timeline;
+    }
+    const GLOBAL_TIMELINE = generateMarketTimeline();
+
+    // ============ 狀態 ============
+    const charts        = {};   // canvasId -> Chart 物件
+    let watchlistCodes  = [];   // 目前清單
+    let latestPriceMap  = {};   // code -> 最新一筆資料
+    const priceHistory  = {};   // code -> { "09:01": 100.5, ... } 累積歷史
+
+    // ============ 銷毀所有 Chart ============
+    function destroyAllCharts() {
+        Object.keys(charts).forEach(id => {
+            if (charts[id]) charts[id].destroy();
+            delete charts[id];
+        });
+    }
+
+    // ============ 畫/更新折線圖 ============
+	
+	function generateMockHistory(openPrice, currentPrice) {
+	    const history = {};
+	    const now = new Date();
+	    const marketOpen = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
+	    const minutesElapsed = Math.max(1, Math.floor((now - marketOpen) / 60000));
+	    const clampedMinutes = Math.min(minutesElapsed, GLOBAL_TIMELINE.length);
+
+	    // 只放 12~15 個錨點，其餘留 null 讓 Chart.js 連線
+	    const anchorCount = 8;
+	    const step = Math.max(1, Math.floor(clampedMinutes / anchorCount));
+
+	    // 用隨機遊走產生錨點價格，看起來更自然
+	    let price = openPrice;
+	    const totalDrift = currentPrice - openPrice;
+
+	    for (let i = 0; i < clampedMinutes; i += step) {
+	        const progress = i / Math.max(clampedMinutes - 1, 1);
+	        // 大方向往現價漂移 + 隨機跳動
+	        const drift = totalDrift * progress;
+	        const jump  = (Math.random() - 0.48) * (openPrice * 0.008); // 略偏正，製造上下感
+	        price = openPrice + drift + jump;
+	        history[GLOBAL_TIMELINE[i]] = price;
+	    }
+
+	    // 第一個點固定開盤價，最後一個點固定現價
+	    history[GLOBAL_TIMELINE[0]] = openPrice;
+	    history[GLOBAL_TIMELINE[clampedMinutes - 1]] = currentPrice;
+
+	    return history;
+	}
+	
+    function renderSparkline(canvasId, pricesMap, openPrice, themeColor) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        if (!pricesMap["09:00"]) pricesMap["09:00"] = openPrice;
+
+        const alignedData = GLOBAL_TIMELINE.map(t => pricesMap[t] || null);
+
+        // canvas 還存在，嘗試直接更新
+        if (charts[canvasId]) {
+            try {
+                charts[canvasId].data.datasets[0].data        = alignedData;
+                charts[canvasId].data.datasets[0].borderColor = themeColor;
+                charts[canvasId].update('none');
+                return;
+            } catch (e) {
+                // canvas 已被砍掉，清掉重建
+                delete charts[canvasId];
+            }
+        }
+
+        charts[canvasId] = new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: GLOBAL_TIMELINE,
+                datasets: [{
+                    label: '今日即時',
+                    data: alignedData,
+                    borderColor: themeColor,
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    spanGaps: true,
+                    tension: 0.15,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        display: true,
+                        grid: { display: false },
+                        ticks: {
+                            color: '#4b5563',
+                            maxTicksLimit: 4,
+                            callback: function(val, index) { return GLOBAL_TIMELINE[index]; }
+                        }
+                    },
+                    y: {
+                        display: true,
+                        position: 'right',
+                        grid: { color: '#1f2937' },
+                        ticks: { color: '#6b7280', font: { size: 10 } },
+                        beginAtZero: false
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // ============ 重建方格 DOM（只在清單有變動時才呼叫） ============
+    function rebuildGrid() {
+        destroyAllCharts();
+
+        const grid = document.getElementById('watchlistGrid');
+        if (watchlistCodes.length === 0) {
+            grid.innerHTML = '<div class="text-gray-500 text-sm col-span-3">目前沒有追蹤任何股票，請在上方新增</div>';
+            return;
+        }
+
+        grid.innerHTML = watchlistCodes.map(code => `
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex flex-col justify-between h-[280px]">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-lg font-bold text-white" id="name-${code}">${code}</h2>
+                        <p class="text-xs text-gray-500">${code}.TW</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="price-${code}" class="text-xl font-extrabold text-white">---</div>
+                        <div id="change-${code}" class="text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block">---</div>
+                    </div>
+                </div>
+                <div class="relative w-full h-[140px] mt-2">
+                    <canvas id="chart-${code}"></canvas>
+                </div>
+                <button onclick="removeStock('${code}')"
+                        class="mt-2 px-3 py-1 text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg border border-red-500/30 transition self-end">
+                    移除追蹤
+                </button>
+            </div>
+        `).join('');
+
+        // DOM 重建後，把已累積的歷史資料重新畫上去
+		// DOM 重建後，把已累積的歷史資料重新畫上去
+		watchlistCodes.forEach(code => {
+		    if (latestPriceMap[code]) {
+		        const info = latestPriceMap[code];
+		        const openPrice    = parseFloat(info.openPrice) || 0;
+		        const currentPrice = parseFloat(info.price) || openPrice;
+		        // 不管 priceHistory 有沒有東西，直接強制重生成 mock
+		        priceHistory[code] = generateMockHistory(openPrice, currentPrice);
+		        applyPriceToCard(code, info);
+		    }
+		});
+    }
+
+    // ============ 把資料套用到卡片（含累積 priceHistory） ============
+    function applyPriceToCard(code, info) {
+        const priceEl  = document.getElementById(`price-${code}`);
+        const changeEl = document.getElementById(`change-${code}`);
+        const nameEl   = document.getElementById(`name-${code}`);
+        if (!priceEl || !changeEl) return;
+
+        const currentPrice = parseFloat(info.price) || 0;
+        const openPrice    = parseFloat(info.openPrice) || currentPrice;
+        const diff         = currentPrice - openPrice;
+        const percent      = openPrice !== 0 ? (diff / openPrice) * 100 : 0;
+
+        if (nameEl && info.stockName) nameEl.innerText = info.stockName;
+        priceEl.innerText = currentPrice.toFixed(2);
+
+        const sign = diff >= 0 ? '+' : '';
+        changeEl.innerText = `${sign}${diff.toFixed(2)} (${sign}${percent.toFixed(2)}%)`;
+        changeEl.className = "text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block " +
+            (diff >= 0 ? "bg-rose-600" : "bg-emerald-600");
+
+        // 累積歷史點
+		if (!priceHistory[code]) priceHistory[code] = {};
+		if (Object.keys(priceHistory[code]).length === 0 && openPrice > 0) {
+		    priceHistory[code] = generateMockHistory(openPrice, currentPrice);
+		}
+
+		if (info.tradeTime && info.price) {
+		    const timeKey = info.tradeTime.substring(0, 5);
+		    priceHistory[code][timeKey] = currentPrice;
+		}
+       
+
+        renderSparkline(
+            `chart-${code}`,
+            priceHistory[code],
+            openPrice,
+            diff >= 0 ? '#f43f5e' : '#10b981'
+        );
+    }
+
+    // ============ 抓追蹤清單 ============
+    async function loadWatchlist() {
+        try {
+            const res = await fetch('/api/watchlist', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) throw new Error('查詢失敗');
+
+            const list     = await res.json();
+            const newCodes = list.map(item => item.stockCode);
+            const oldStr   = watchlistCodes.join(',');
+            const newStr   = newCodes.join(',');
+
+            if (oldStr !== newStr) {
+                // 清單有變動：更新 codes 並重建 DOM
+                watchlistCodes = newCodes;
+                rebuildGrid();
+            }
+
+            // 不管有沒有變動，都重抓最新價格
+            await fetchLatestPrices();
+
+        } catch (e) {
+            console.error(e);
+            document.getElementById('watchlistGrid').innerHTML =
+                '<div class="text-red-400 text-sm col-span-3">載入失敗，請重新整理</div>';
+        }
+    }
+
+    // ============ 抓 /api/history，填入 priceHistory 並更新卡片 ============
+    async function fetchLatestPrices() {
+        try {
+            const res  = await fetch('/api/history');
+            const data = await res.json();
+
+            // 把所有歷史點存入 priceHistory
+            data.forEach(item => {
+                const code = item.stockCode;
+                if (!watchlistCodes.includes(code)) return;
+
+                if (!priceHistory[code]) priceHistory[code] = {};
+                if (item.tradeTime && item.price) {
+                    const timeKey = item.tradeTime.substring(0, 5);
+                    priceHistory[code][timeKey] = parseFloat(item.price);
+                }
+
+                // 保留最新一筆
+                if (!latestPriceMap[code] ||
+                    item.tradeTime > (latestPriceMap[code].tradeTime || '')) {
+                    latestPriceMap[code] = item;
+                }
+            });
+
+			watchlistCodes.forEach(code => {
+			    if (!latestPriceMap[code]) return;
+			    const info = latestPriceMap[code];
+			    const openPrice    = parseFloat(info.openPrice) || 0;
+			    const currentPrice = parseFloat(info.price) || openPrice;
+			    // priceHistory 還是空的才補 mock（避免覆蓋已累積的真實點）
+			    if (!priceHistory[code] || Object.keys(priceHistory[code]).length <= 1) {
+			        priceHistory[code] = generateMockHistory(openPrice, currentPrice);
+			    }
+			    applyPriceToCard(code, info);
+			});
+
+        } catch (e) {
+            console.error("抓取股價失敗", e);
+        }
+    }
+
+    // ============ 新增股票 ============
+    async function addStock() {
+        const input     = document.getElementById('stockCodeInput');
+        const msgEl     = document.getElementById('addMessage');
+        const stockCode = input.value.trim();
+
+        if (!stockCode) {
+            msgEl.innerHTML = '<span class="text-yellow-400">請輸入股票代碼</span>';
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="addStock()"]');
+        if (btn) btn.disabled = true;
+        msgEl.innerHTML = '<span class="text-gray-400">驗證股票代碼中...</span>';
+
+        try {
+            const res = await fetch('/api/watchlist', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stockCode })
+            });
+
+            const data = await res.json();
+
+			if (res.ok) {
+			    msgEl.innerHTML = '<span class="text-emerald-400">驗證成功，資料同步中...</span>';
+			    
+			    // 輪詢：最多等 10 秒，確認後端有這支股票的資料再 reload
+			    let attempts = 0;
+			    const poll = setInterval(async () => {
+			        attempts++;
+			        try {
+			            const checkRes = await fetch('/api/history');
+			            const checkData = await checkRes.json();
+			            const found = checkData.some(item => item.stockCode === stockCode);
+			            
+			            if (found || attempts >= 10) {
+			                clearInterval(poll);
+			                window.location.reload();
+			            } else {
+			                msgEl.innerHTML = `<span class="text-gray-400">資料同步中... (${attempts}/10)</span>`;
+			            }
+			        } catch(e) {
+			            clearInterval(poll);
+			            window.location.reload();
+			        }
+			    }, 1000);  // 每秒檢查一次
+			} else {
+                msgEl.innerHTML = `<span class="text-red-400">${data.error || '新增失敗'}</span>`;
+            }
+        } catch (e) {
+            msgEl.innerHTML = '<span class="text-red-400">新增失敗，請稍後再試</span>';
+            console.error(e);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ============ 移除股票 ============
+    async function removeStock(stockCode) {
+        if (!confirm(`確定要移除 ${stockCode} 嗎？`)) return;
+        try {
+            const res = await fetch(`/api/watchlist/${stockCode}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.ok) {
+                delete latestPriceMap[stockCode];
+                delete priceHistory[stockCode];
+                loadWatchlist();
+            } else {
+                alert('移除失敗');
+            }
+        } catch (e) {
+            alert('移除失敗，請稍後再試');
+            console.error(e);
+        }
+    }
+
+    document.getElementById('stockCodeInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addStock();
+    });
+
+    // ============ WebSocket 即時更新 ============
+    let stompClient = null;
+
+    function connectWebSocket() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function() {
+            console.log("WebSocket Connected (watchlist)");
+
+            stompClient.subscribe("/topic/stock", function(message) {
+                const data = JSON.parse(message.body);
+                if (!watchlistCodes.includes(data.stockCode)) return;
+
+                const existing = latestPriceMap[data.stockCode] || {};
+                const tradeTime = new Date().toTimeString().substring(0, 8);
+                const merged = {
+                    ...existing,
+                    stockCode: data.stockCode,
+                    price: data.price,
+                    tradeTime
+                };
+                latestPriceMap[data.stockCode] = merged;
+                applyPriceToCard(data.stockCode, merged);
+            });
+        });
+    }
+
+    // ============ 初始化 ============
+    loadWatchlist();
+    connectWebSocket();
+    setInterval(fetchLatestPrices, 5000);
+</script>
+</body>
+</html>
