@@ -68,7 +68,7 @@ public class StockServiceImpl implements StockService {
             List<StockHistoryData> batchList = new ArrayList<>();
 
             for (StockInfo info : stockResponse.msgArray) {
-                // 🛡️ 防護：代碼或名稱缺失就跳過這一筆，避免整批 batch insert 被拖垮
+                // 防護：代碼或名稱缺失就跳過這一筆，避免整批 batch insert 被拖垮
                 if (info.c == null || info.c.trim().isEmpty()) {
                     System.out.println("⚠️ 跳過：股票代碼為空");
                     continue;
@@ -78,7 +78,7 @@ public class StockServiceImpl implements StockService {
                     continue;
                 }
 
-                // 🎯 核心修正：不管是哪一檔股票，都必須準確抓取市價與開盤價，儀表板才不會空掉
+                // 必須準確抓取市價與開盤價，儀表板才不會空
                 BigDecimal twPrice = info.getPriceAsBigDecimal();
                 BigDecimal openPrice = info.getOpenPriceAsBigDecimal();
                 String time = info.t != null ? info.t : "13:30:00";
@@ -86,7 +86,7 @@ public class StockServiceImpl implements StockService {
                 BigDecimal currentAdr = BigDecimal.ZERO;
                 BigDecimal netArbitrageSpace = BigDecimal.ZERO;
 
-                // 🌟 只有台積電需要單獨進行跨國量化套利流分析
+                // 只有台積電需要單獨進行跨國量化套利流分析
                 if ("2330".equals(info.c)) {
                     currentAdr = realAdrPrice; 
                     
@@ -124,7 +124,7 @@ public class StockServiceImpl implements StockService {
                     }
                 }
 
-                // 🎯 這裡印出 Log，確保每一檔股票的市價流向清晰可見
+                // 印出 Log，確保每一檔股票的市價流向清晰可見
                 System.out.println(String.format("🕵️ 數據流入 -> %s | 市價: %s | 開盤: %s | 真實ADR折合: %s | 淨套利空間: %s%%", 
                         info.n, twPrice, openPrice, currentAdr, netArbitrageSpace));
                 messagingTemplate.convertAndSend(
@@ -135,7 +135,7 @@ public class StockServiceImpl implements StockService {
                                 netArbitrageSpace.toString()));
                 
 
-                // 🎯 核心修正：將正確的 twPrice 與 openPrice 塞進每一個物件，丟進資料庫
+                // 修正：將正確的 twPrice 與 openPrice 塞進每一個物件，丟進資料庫
                 batchList.add(new StockHistoryData(0, info.c, info.n, twPrice, openPrice, currentAdr, netArbitrageSpace, time, ""));
             }
 

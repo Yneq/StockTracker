@@ -2,7 +2,7 @@ package com.util;
 
 public class FinMindConfig {
 
-    // 從環境變數 FINMIND_TOKEN 讀取，不寫死在程式碼裡，避免上傳到 GitHub 洩漏
+    // 從環境變數 FINMIND_TOKEN 讀取
     public static String getToken() {
         String token = System.getenv("FINMIND_TOKEN");
 

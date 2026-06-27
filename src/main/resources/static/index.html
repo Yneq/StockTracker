@@ -59,7 +59,6 @@
                     <canvas id="chart-2330"></canvas>
                 </div>
 
-				<!-- 替換原本這段 -->
 				<div class="pt-3 border-t border-gray-800 flex justify-between items-center text-xs text-gray-400 whitespace-nowrap overflow-hidden">
 				    <div class="flex items-center gap-1 flex-shrink-0">
 				        <span>美股 TSM 折合:</span>
@@ -134,7 +133,7 @@
 		    window.location.href = "/login.html";
 		}
 
-		// 改進版：更穩健的 JWT 解碼中文
+		// JWT 解碼中文
 		function decodeUsername(token) {
 		    try {
 		        const base64Url = token.split('.')[1];
@@ -218,7 +217,7 @@
 		    //    }
 		    //}
 
-		    // 更新漲跌幅（現在會跟著即時數據變動）
+		    // 更新漲跌幅
 		    const changeElement = document.getElementById("change-" + data.stockCode);
 		    if (changeElement && data.change !== undefined) {
 		        const changeValue = parseFloat(data.change) || 0;
@@ -245,7 +244,7 @@
 		            const premium = parseFloat(data.adrPremium);
 		            spaceElement.innerText = (premium >= 0 ? '+' : '') + premium.toFixed(2) + "%";
 		            
-		            // 台灣習慣：正數用紅色（套利空間大 = 好）
+		          
 		            spaceElement.classList.remove("text-emerald-500", "text-rose-500");
 		            spaceElement.classList.add(premium >= 0 ? "text-rose-500" : "text-emerald-500");
 		        }
@@ -268,43 +267,42 @@
 	    }
 	    const GLOBAL_TIMELINE = generateMarketTimeline();
 
-		// 🎯 修正版：嚴格限制邊界的昨日走勢模擬器
-			    function generateMockYesterdayData(currentOpen, stockCode) {
-			        const mockData = [];
-			        
-			        // 根據今天大漲的市況，反推昨天正確的開盤與收盤邊界
-			        let yOpen = currentOpen - 80;  // 昨開
-			        let yClose = currentOpen - 65; // 昨收 (也就是大約 2250~2260 附近)
-			        
-			        if (stockCode === '2317') { yOpen = currentOpen - 4; yClose = currentOpen - 2; }
-			        if (stockCode === '2454') { yOpen = currentOpen - 130; yClose = currentOpen - 95; }
-			        
-			        const totalSteps = GLOBAL_TIMELINE.length;
-			        
-			        for (let i = 0; i < totalSteps; i++) {
-			            // 📈 線性插值 (Lerp)：讓價格完美從「昨開」平滑滑動到「昨收」
-			            let progress = i / (totalSteps - 1);
-			            let base = yOpen + (yClose - yOpen) * progress;
-			            
-			            // 🎯 大幅降低噪點頻率（把 i * 0.02 改成 0.05），並讓波動變小、變平滑，點就不會看起來密密麻麻
-			            let swing = Math.sin(i * 0.05) * (yOpen * 0.003); 
-			            let noise = (Math.random() - 0.5) * (yOpen * 0.001);
-			            
-			            // 為了美觀，我們只在每 3 分鐘才畫一個點，其餘給 null 讓 Chart.js 自動連線（spanGaps）
-			            if (i % 3 === 0 || i === totalSteps - 1) {
-			                mockData.push(base + swing + noise);
-			            } else {
-			                mockData.push(null);
-			            }
-			        }
-			        return mockData;
-			    }
+		// 修正嚴格限制邊界的昨日走勢模擬器
+	    function generateMockYesterdayData(currentOpen, stockCode) {
+	        const mockData = [];
+	        
+	        // 根據今天大漲的市況，反推昨天正確的開盤與收盤邊界
+	        let yOpen = currentOpen - 80;  // 昨開
+	        let yClose = currentOpen - 65; // 昨收 (也就是大約 2250~2260 附近)
+	        
+	        if (stockCode === '2317') { yOpen = currentOpen - 4; yClose = currentOpen - 2; }
+	        if (stockCode === '2454') { yOpen = currentOpen - 130; yClose = currentOpen - 95; }
+	        
+	        const totalSteps = GLOBAL_TIMELINE.length;
+	        
+	        for (let i = 0; i < totalSteps; i++) {
+	            // 線性插值 (Lerp)：讓價格完美從「昨開」平滑滑動到「昨收」
+	            let progress = i / (totalSteps - 1);
+	            let base = yOpen + (yClose - yOpen) * progress;
+	            
+	            // 大幅降低噪點頻率
+	            let swing = Math.sin(i * 0.05) * (yOpen * 0.003); 
+	            let noise = (Math.random() - 0.5) * (yOpen * 0.001);
+	            
+	            // 只在每 3 分鐘才畫一個點，其餘給 null 讓 Chart.js 自動連線（spanGaps）
+	            if (i % 3 === 0 || i === totalSteps - 1) {
+	                mockData.push(base + swing + noise);
+	            } else {
+	                mockData.push(null);
+	            }
+	        }
+	        return mockData;
+	    }
 
-	    // 🎯 新增：今日即時線的補強生成器
+	    // 新增：今日即時線的補強生成器
 	    // 跟 watchlist.html 用的 generateMockHistory 同一套邏輯：
-	    // 用「完整 271 分鐘」生成走勢，不依賴「現在距離開盤過了多久」，
 	    // 避免非交易時段（凌晨、晚上、收盤後）算出來的經過分鐘數趨近 0，
-	    // 導致整條線塌縮成一個點、看起來像橫線。
+	   
 	    function generateMockHistory(openPrice, currentPrice) {
 	        const history = {};
 	        const totalMinutes = GLOBAL_TIMELINE.length; // 固定 271（9:00~13:30）
@@ -336,13 +334,11 @@
 	            pricesMap["09:00"] = openPrice;
 	        }
 
-	        // 🎯 補強邏輯：如果真實資料點太少（例如主機沒開很久，只抓到1~2筆，
-	        // 或同一時間點被重複覆蓋），畫出來的線會太單薄、接近一條直線。
+	        // 補強邏輯：如果真實資料點太少（例如主機沒開很久，只抓到1~2筆，
 	        // 這裡先用 generateMockHistory 生成一條完整的基底走勢，
-	        // 再用「真實資料」蓋掉對應時間點，這樣：
 	        // - 有真實資料的時間點 → 顯示真實價格
 	        // - 沒有真實資料的時間點 → 顯示生成的合理走勢
-	        // 整條線就會是完整、有起伏的樣子，不會因為資料不足而變成橫線。
+	        
 	        const currentPriceForMock = pricesMap[GLOBAL_TIMELINE[GLOBAL_TIMELINE.length - 1]]
 	            || Object.values(pricesMap).slice(-1)[0]
 	            || openPrice;
@@ -397,7 +393,6 @@ const yesterdayData = generateMockYesterdayData(openPrice, canvasId.replace('cha
 	                    {
 	                        label: '昨日走勢',
 	                        data: yesterdayData,
-	                        // 🎯 修正一：昨日背景線大幅加深顏色 (使用高飽和度的中灰色，透明度調高到 0.6)
 	                        borderColor: 'rgba(156, 163, 175, 0.6)', 
 	                        borderWidth: 2,
 	                        borderDash: [3, 3], 
@@ -575,15 +570,14 @@ const yesterdayData = generateMockYesterdayData(openPrice, canvasId.replace('cha
 				    const diff = currentPrice - yesterdayClose;
 				    const percent = yesterdayClose !== 0 ? (diff / yesterdayClose) * 100 : 0;
 
-				    // 更新價格（保留你 +5 的習慣）
-				    document.getElementById(config.priceId).innerText = (currentPrice + 5).toFixed(2);
+				    // 更新價格（保留+5的測試 → 已取消）
+				    document.getElementById(config.priceId).innerText = (currentPrice).toFixed(2);
 
 				    // 更新漲跌幅（真實計算）
 				    const changeEl = document.getElementById(config.changeId);
 				    const sign = diff >= 0 ? '+' : '';
 				    changeEl.innerText = `${sign}${diff.toFixed(2)} (${sign}${percent.toFixed(2)}%)`;
 
-				    // 台灣風格：紅上漲 / 綠下跌
 				    changeEl.className = `text-sm font-bold mt-0.5 px-2 py-0.5 rounded text-white inline-block ${
 				        diff >= 0 ? 'bg-rose-600' : 'bg-emerald-600'
 				    }`;

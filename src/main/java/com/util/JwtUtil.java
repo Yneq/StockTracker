@@ -10,9 +10,7 @@ import io.jsonwebtoken.security.Keys;
 public class JwtUtil {
 	
 	public static void main(String[] args) {
-//		String username =
-//			    JwtUtil.getUsername("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ2YW5jZSIsImlhdCI6MTc4MjEyMjk2NywiZXhwIjoxNzgyMjA5MzY3fQ.TG3vYP2sVe2PYAEskBPXqtJjUIdxFeQQ3UFhNlQz5jA");
-//				System.out.println(username);
+
 	}
 
     private static final String SECRET =

@@ -125,8 +125,8 @@
 	function generateMockHistory(openPrice, currentPrice) {
 	    const history = {};
 
-	    // 不要用「現在距離今天09:00」，因為非交易時段（凌晨/晚上）算出來會是負數或不合理的值
-	    // 改成：固定假設這是一個完整交易日（9:00~13:30，共271分鐘），生成完整這段時間的模擬走勢
+
+	    // 固定假設這是一個完整交易日（9:00~13:30，共271分鐘），生成完整這段時間的模擬走勢
 	    const totalMinutes = GLOBAL_TIMELINE.length;  // 271
 
 	    const anchorCount = 8;
@@ -243,7 +243,6 @@
             </div>
         `).join('');
 
-        // DOM 重建後，把已累積的歷史資料重新畫上去
 		// DOM 重建後，把已累積的歷史資料重新畫上去
 		watchlistCodes.forEach(code => {
 		    if (latestPriceMap[code]) {

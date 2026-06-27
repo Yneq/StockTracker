@@ -5,6 +5,7 @@ import com.model.Watchlist;
 
 public interface WatchlistDao {
 
+	//create
     boolean addStock(
             Long userId,
             String stockCode,
@@ -12,11 +13,12 @@ public interface WatchlistDao {
 
     List<Watchlist> findByUserId(
             Long userId);
-
+    
+    //delete
     void deleteStock(
             Long userId,
             String stockCode);
 
-    // 查詢所有使用者目前追蹤的股票（去重，含市場類別），讓定時任務知道要抓哪些股票、用哪個市場前綴
+    //read/update
     List<Watchlist> findAllDistinctStocks();
 }

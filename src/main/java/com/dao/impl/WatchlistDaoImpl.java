@@ -43,23 +43,18 @@ public class WatchlistDaoImpl implements WatchlistDao{
 	@Override
 	public List<Watchlist> findByUserId(Long userId) {
 
-		String sql =
-			"SELECT * FROM watchlist WHERE user_id = ?";
+		String sql="SELECT * FROM watchlist WHERE user_id = ?";
 
 		List<Watchlist> list = new ArrayList<>();
 
 		try (
-			Connection conn =
-				DBUtil.getConnection();
+			Connection conn=DBUtil.getConnection();
 
-			PreparedStatement ps =
-				conn.prepareStatement(sql)
+			PreparedStatement ps=conn.prepareStatement(sql)
 		) {
 
 			ps.setLong(1, userId);
-
 			ResultSet rs = ps.executeQuery();
-
 			while (rs.next()) {
 				Watchlist watchlist = new Watchlist();
 				watchlist.setId(rs.getLong("id"));
@@ -80,15 +75,12 @@ public class WatchlistDaoImpl implements WatchlistDao{
 	@Override
 	public void deleteStock(Long userId, String stockCode) {
 
-		String sql =
-			"DELETE FROM watchlist WHERE user_id = ? AND stock_code = ?";
+		String sql="DELETE FROM watchlist WHERE user_id = ? AND stock_code = ?";
 
 		try (
-			Connection conn =
-				DBUtil.getConnection();
+			Connection conn=DBUtil.getConnection();
 
-			PreparedStatement ps =
-				conn.prepareStatement(sql)
+			PreparedStatement ps=conn.prepareStatement(sql)
 		) {
 
 			ps.setLong(1, userId);
@@ -105,17 +97,14 @@ public class WatchlistDaoImpl implements WatchlistDao{
 	public List<Watchlist> findAllDistinctStocks() {
 
 		// 用 DISTINCT ON 取得每個 stock_code 唯一一筆（含 market），避免多使用者追蹤同一檔造成重複
-		String sql =
-			"SELECT DISTINCT ON (stock_code) stock_code, market FROM watchlist";
+		String sql="SELECT DISTINCT ON (stock_code) stock_code, market FROM watchlist";
 
 		List<Watchlist> list = new ArrayList<>();
 
 		try (
-			Connection conn =
-				DBUtil.getConnection();
+			Connection conn=DBUtil.getConnection();
 
-			PreparedStatement ps =
-				conn.prepareStatement(sql)
+			PreparedStatement ps=conn.prepareStatement(sql)
 		) {
 
 			ResultSet rs = ps.executeQuery();
