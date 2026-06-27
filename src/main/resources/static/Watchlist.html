@@ -124,31 +124,27 @@
 	
 	function generateMockHistory(openPrice, currentPrice) {
 	    const history = {};
-	    const now = new Date();
-	    const marketOpen = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
-	    const minutesElapsed = Math.max(1, Math.floor((now - marketOpen) / 60000));
-	    const clampedMinutes = Math.min(minutesElapsed, GLOBAL_TIMELINE.length);
 
-	    // 只放 12~15 個錨點，其餘留 null 讓 Chart.js 連線
+	    // 不要用「現在距離今天09:00」，因為非交易時段（凌晨/晚上）算出來會是負數或不合理的值
+	    // 改成：固定假設這是一個完整交易日（9:00~13:30，共271分鐘），生成完整這段時間的模擬走勢
+	    const totalMinutes = GLOBAL_TIMELINE.length;  // 271
+
 	    const anchorCount = 8;
-	    const step = Math.max(1, Math.floor(clampedMinutes / anchorCount));
+	    const step = Math.max(1, Math.floor(totalMinutes / anchorCount));
 
-	    // 用隨機遊走產生錨點價格，看起來更自然
 	    let price = openPrice;
 	    const totalDrift = currentPrice - openPrice;
 
-	    for (let i = 0; i < clampedMinutes; i += step) {
-	        const progress = i / Math.max(clampedMinutes - 1, 1);
-	        // 大方向往現價漂移 + 隨機跳動
+	    for (let i = 0; i < totalMinutes; i += step) {
+	        const progress = i / Math.max(totalMinutes - 1, 1);
 	        const drift = totalDrift * progress;
-	        const jump  = (Math.random() - 0.48) * (openPrice * 0.008); // 略偏正，製造上下感
+	        const jump  = (Math.random() - 0.48) * (openPrice * 0.008);
 	        price = openPrice + drift + jump;
 	        history[GLOBAL_TIMELINE[i]] = price;
 	    }
 
-	    // 第一個點固定開盤價，最後一個點固定現價
 	    history[GLOBAL_TIMELINE[0]] = openPrice;
-	    history[GLOBAL_TIMELINE[clampedMinutes - 1]] = currentPrice;
+	    history[GLOBAL_TIMELINE[totalMinutes - 1]] = currentPrice;
 
 	    return history;
 	}

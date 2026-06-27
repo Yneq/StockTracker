@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title> Mac Stocks Style Dashboard</title>
+    <title> Mac Stocks Style Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 	
@@ -16,7 +16,7 @@
 		<header class="flex justify-between items-center border-b border-gray-900 pb-4 mb-8">
 				    <div class="flex items-baseline gap-3">
 				        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-				             股市 <span class="text-sm font-normal text-gray-500">本機測試端</span>
+							 股市 <span class="text-sm font-normal text-gray-500">本機測試端</span>
 				        </h1>
 				        <div id="welcome-user" class="text-white text-base font-semibold border-l border-gray-800 pl-4 h-5 flex items-center">
 				            👋 載入中...
@@ -300,6 +300,35 @@
 			        return mockData;
 			    }
 
+	    // 🎯 新增：今日即時線的補強生成器
+	    // 跟 watchlist.html 用的 generateMockHistory 同一套邏輯：
+	    // 用「完整 271 分鐘」生成走勢，不依賴「現在距離開盤過了多久」，
+	    // 避免非交易時段（凌晨、晚上、收盤後）算出來的經過分鐘數趨近 0，
+	    // 導致整條線塌縮成一個點、看起來像橫線。
+	    function generateMockHistory(openPrice, currentPrice) {
+	        const history = {};
+	        const totalMinutes = GLOBAL_TIMELINE.length; // 固定 271（9:00~13:30）
+
+	        const anchorCount = 8;
+	        const step = Math.max(1, Math.floor(totalMinutes / anchorCount));
+
+	        const totalDrift = currentPrice - openPrice;
+
+	        for (let i = 0; i < totalMinutes; i += step) {
+	            const progress = i / Math.max(totalMinutes - 1, 1);
+	            const drift = totalDrift * progress;
+	            const jump  = (Math.random() - 0.48) * (openPrice * 0.008);
+	            const price = openPrice + drift + jump;
+	            history[GLOBAL_TIMELINE[i]] = price;
+	        }
+
+	        // 起點固定開盤價，終點固定現價，確保線的頭尾準確
+	        history[GLOBAL_TIMELINE[0]] = openPrice;
+	        history[GLOBAL_TIMELINE[totalMinutes - 1]] = currentPrice;
+
+	        return history;
+	    }
+
 	    function createSparkline(canvasId, pricesMap, openPrice, yesterdayClose, themeColor) {
 	        const ctx = document.getElementById(canvasId).getContext('2d');
 	        
@@ -307,8 +336,30 @@
 	            pricesMap["09:00"] = openPrice;
 	        }
 
+	        // 🎯 補強邏輯：如果真實資料點太少（例如主機沒開很久，只抓到1~2筆，
+	        // 或同一時間點被重複覆蓋），畫出來的線會太單薄、接近一條直線。
+	        // 這裡先用 generateMockHistory 生成一條完整的基底走勢，
+	        // 再用「真實資料」蓋掉對應時間點，這樣：
+	        // - 有真實資料的時間點 → 顯示真實價格
+	        // - 沒有真實資料的時間點 → 顯示生成的合理走勢
+	        // 整條線就會是完整、有起伏的樣子，不會因為資料不足而變成橫線。
+	        const currentPriceForMock = pricesMap[GLOBAL_TIMELINE[GLOBAL_TIMELINE.length - 1]]
+	            || Object.values(pricesMap).slice(-1)[0]
+	            || openPrice;
+
+	        const realDataPointCount = Object.keys(pricesMap).length;
+
+	        let finalPricesMap = pricesMap;
+
+	        // 真實資料點少於某個門檻（例如少於5個不同時間點），視為資料不足，啟用 mock 補強
+	        if (realDataPointCount < 5) {
+	            const mockBase = generateMockHistory(openPrice, currentPriceForMock);
+	            // 用真實資料覆蓋 mock 對應的時間點，真實資料優先
+	            finalPricesMap = { ...mockBase, ...pricesMap };
+	        }
+
 	        const alignedTodayData = GLOBAL_TIMELINE.map(timeTick => {
-	            return pricesMap[timeTick] || null;
+	            return finalPricesMap[timeTick] !== undefined ? finalPricesMap[timeTick] : null;
 	        });
 
 const yesterdayData = generateMockYesterdayData(openPrice, canvasId.replace('chart-', ''));
