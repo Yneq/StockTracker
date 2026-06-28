@@ -29,7 +29,7 @@ public class WatchlistController {
     private UserDao userDao = new UserDaoImpl();
     private final Gson gson = new Gson();
 
-    // token 改從環境變數讀取，不寫死在程式碼裡（com.util.FinMindConfig.getToken()）
+    // token環境變數讀取
 
     // 共用：從 token 解析出登入者的 userId
     private Long getUserId(String authHeader) {

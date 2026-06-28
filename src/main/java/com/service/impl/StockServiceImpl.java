@@ -16,7 +16,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import com.service.analysis.AdrAnalysisService;
 import com.model.analysis.AdrAnalysisResult;
-import com.StockInfo;
+import com.model.StockInfo;
 import com.client.AdrClient;
 import com.client.FxRateClient;
 import com.client.TwseClient;
@@ -63,8 +63,7 @@ public class StockServiceImpl implements StockService {
             // 抓取真實美股與台銀即時匯率
             BigDecimal usdRate =fxRateClient.getUsdTwdRate();
 
-            BigDecimal realAdrPrice =adrClient.getTsmEquivalentPrice(
-            		usdRate);
+            BigDecimal realAdrPrice =adrClient.getTsmEquivalentPrice(usdRate);
             List<StockHistoryData> batchList = new ArrayList<>();
 
             for (StockInfo info : stockResponse.msgArray) {
@@ -151,7 +150,11 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public List<StockHistoryData> fetchDisplayData() throws StockDataException {
-        try { return stockDao.getAllHistory(); } catch (Exception e) { throw new StockDataException("讀取歷史資料失敗", e); }
+        try {
+        	return stockDao.getAllHistory(); 
+        	} catch (Exception e) {
+        		throw new StockDataException("讀取歷史資料失敗", e); 
+        		}
     }
 
 }

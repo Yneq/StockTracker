@@ -44,12 +44,10 @@ public class WatchlistDaoImpl implements WatchlistDao{
 	public List<Watchlist> findByUserId(Long userId) {
 
 		String sql="SELECT * FROM watchlist WHERE user_id = ?";
-
 		List<Watchlist> list = new ArrayList<>();
-
+		
 		try (
 			Connection conn=DBUtil.getConnection();
-
 			PreparedStatement ps=conn.prepareStatement(sql)
 		) {
 
@@ -79,13 +77,11 @@ public class WatchlistDaoImpl implements WatchlistDao{
 
 		try (
 			Connection conn=DBUtil.getConnection();
-
 			PreparedStatement ps=conn.prepareStatement(sql)
 		) {
 
 			ps.setLong(1, userId);
 			ps.setString(2, stockCode);
-
 			ps.executeUpdate();
 
 		} catch (Exception e) {
@@ -100,15 +96,10 @@ public class WatchlistDaoImpl implements WatchlistDao{
 		String sql="SELECT DISTINCT ON (stock_code) stock_code, market FROM watchlist";
 
 		List<Watchlist> list = new ArrayList<>();
-
-		try (
-			Connection conn=DBUtil.getConnection();
-
-			PreparedStatement ps=conn.prepareStatement(sql)
-		) {
+		try (Connection conn=DBUtil.getConnection();
+			PreparedStatement ps=conn.prepareStatement(sql)) {
 
 			ResultSet rs = ps.executeQuery();
-
 			while (rs.next()) {
 				Watchlist watchlist = new Watchlist();
 				watchlist.setStockCode(rs.getString("stock_code"));

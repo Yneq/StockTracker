@@ -44,16 +44,9 @@ public class AuthController {
             @RequestHeader("Authorization")
             String authHeader) {
 
-        String token =
-                authHeader.replace(
-                        "Bearer ",
-                        "");
-
-        String username =
-                JwtUtil.getUsername(token);
-
-        return userDao.findByUsername(
-                username);
+	    String token=authHeader.replace("Bearer ","");
+	    String username=JwtUtil.getUsername(token);
+	    return userDao.findByUsername(username);
     }
     
 }
