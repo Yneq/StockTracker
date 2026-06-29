@@ -187,4 +187,4 @@ stompClient.connect({}, () => {
 
 ## License
 
-本專案僅供學習與個人使用，資料來源（TWSE、FinMind）之使用條款請參閱各自官方網站。
+本專案資料來源（TWSE、FinMind）之使用條款請參閱各自官方網站。
