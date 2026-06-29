@@ -40,27 +40,33 @@ A real-time Taiwan stock tracking system. Integrates Taiwan Stock Exchange (TWSE
 
 ## Project Architecture
 
-Uses a traditional layered architecture (MVC + DAO) without Spring Data JPA — all SQL is hand-written and executed via `PreparedStatement`:
+Uses a classic Layered Architecture (Controller → Service → DAO). Business logic is separated from the REST layer and database access. Instead of using Spring Data JPA, every database operation is implemented with hand-written SQL using PreparedStatement, providing full control over SQL execution.
 
 ```
 com/
-├── Main.java                  # Application entry point, scheduled tasks
-├── controller/                 # REST API entry points
-│   ├── AuthController          # Register / login / get current user
-│   └── WatchlistController     # Watchlist CRUD
-├── service/                    # Business logic layer
-│   ├── impl/StockServiceImpl   # Stock price fetching and storage logic
-│   └── impl/AuthServiceImpl    # Authentication logic
-├── dao/                         # Data access layer (hand-written SQL)
-│   └── impl/                   # StockDaoImpl, UserDaoImpl, WatchlistDaoImpl
-├── client/                      # External API clients
-│   ├── TwseClient               # TWSE real-time quotes
-│   ├── FinMindClient             # FinMind monthly revenue / stock price data
+├── Main.java                     # Spring Boot application entry point
+├── controller/                   # REST API layer
+│   ├── AuthController            # User registration, login, authentication
+│   ├── WatchlistController       # Watchlist CRUD APIs
+│   └── StockController           # Stock-related APIs
+├── service/                      # Business logic layer
+│   ├── impl/
+│   │   ├── AuthServiceImpl
+│   │   ├── WatchlistServiceImpl
+│   │   └── StockServiceImpl
+├── dao/                          # Data access layer (hand-written SQL)
+│   └── impl/
+│       ├── UserDaoImpl
+│       ├── WatchlistDaoImpl
+│       └── StockDaoImpl
+├── client/                       # External API integrations
+│   ├── TwseClient                # TWSE real-time stock quotes
+│   ├── FinMindClient             # Historical prices and monthly revenue
 │   ├── AdrClient                 # US ADR quotes
 │   └── FxRateClient              # Exchange rate data
-├── model/                       # Data models (Entities)
-├── util/                        # Utility classes (DBUtil, JwtUtil, FinMindConfig...)
-└── config/                      # WebSocket configuration
+├── model/                        # Entity and DTO classes
+├── util/                         # Utilities (DBUtil, JwtUtil, Config...)
+└── config/                       # Spring configuration (WebSocket, CORS, etc.)
 ```
 
 ## Setup
