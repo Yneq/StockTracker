@@ -40,27 +40,33 @@
 
 ## 專案架構
 
-採用傳統分層架構（MVC + DAO），不使用 Spring Data JPA，所有 SQL 皆手寫並透過 `PreparedStatement` 執行：
+採用經典的分層式架構（Layered Architecture，Controller → Service → DAO）。將業務邏輯（Business Logic）與 REST API 層及資料庫存取層分離，以提升程式的可維護性與可讀性。專案未使用 Spring Data JPA，而是透過 PreparedStatement 手動撰寫並執行所有 SQL，對資料庫操作擁有完整的控制權。
 
 ```
 com/
-├── Main.java                  # 應用程式入口，定時任務排程
-├── controller/                 # REST API 入口
-│   ├── AuthController          # 註冊／登入／取得當前使用者
-│   └── WatchlistController     # 追蹤清單 CRUD
-├── service/                    # 業務邏輯層
-│   ├── impl/StockServiceImpl   # 股價抓取與儲存邏輯
-│   └── impl/AuthServiceImpl    # 帳號認證邏輯
-├── dao/                         # 資料庫存取層（手寫 SQL）
-│   └── impl/                   # StockDaoImpl, UserDaoImpl, WatchlistDaoImpl
-├── client/                      # 外部 API 客戶端
-│   ├── TwseClient               # 證交所即時行情
-│   ├── FinMindClient             # FinMind 月營收／股價資料
-│   ├── AdrClient                 # 美股 ADR 報價
+├── Main.java                     # Spring Boot 應用程式入口
+├── controller/                   # REST API 控制層
+│   ├── AuthController            # 使用者註冊、登入與身分驗證
+│   ├── WatchlistController       # 自選股 CRUD API
+│   └── StockController           # 股票相關 API
+├── service/                      # 商業邏輯層
+│   ├── impl/
+│   │   ├── AuthServiceImpl       # 身分驗證與使用者服務
+│   │   ├── WatchlistServiceImpl  # 自選股業務邏輯
+│   │   └── StockServiceImpl      # 股票資料處理與查詢邏輯
+├── dao/                          # 資料存取層（手寫 SQL）
+│   └── impl/
+│       ├── UserDaoImpl           # 使用者資料存取
+│       ├── WatchlistDaoImpl      # 自選股資料存取
+│       └── StockDaoImpl          # 股票資料存取
+├── client/                       # 外部 API 整合
+│   ├── TwseClient                # 台灣證交所即時股價
+│   ├── FinMindClient             # 歷史股價與月營收資料
+│   ├── AdrClient                 # 美國 ADR 即時報價
 │   └── FxRateClient              # 匯率資料
-├── model/                       # 資料模型（Entity）
-├── util/                        # 工具類別（DBUtil, JwtUtil, FinMindConfig...）
-└── config/                      # WebSocket 設定
+├── model/                        # Entity、DTO 等資料模型
+├── util/                         # 工具類別（DBUtil、JwtUtil、Config...）
+└── config/                       # Spring 設定（WebSocket、CORS 等）
 ```
 
 ## 環境設定
